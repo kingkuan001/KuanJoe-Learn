@@ -4,6 +4,15 @@ document.addEventListener("DOMContentLoaded", function () {
     const answerBox = document.getElementById("answer");
     const searchButton = document.getElementById("searchButton");
     const loader = document.getElementById("loadingSpinner");
+    const textCache = {};
+
+    pdfList.addEventListener("change", function () {
+        const selectedPdf = pdfList.value;
+        if (selectedPdf && !textCache[selectedPdf]) {
+            const pdfPath = `https://raw.githubusercontent.com/kingkuan001/KuanJoe-Learn/main/${selectedPdf}`;
+            preloadPDFText(selectedPdf, pdfPath);
+        }
+    });
 
     searchButton.addEventListener("click", function () {
         const selectedPdf = pdfList.value;
@@ -11,14 +20,15 @@ document.addEventListener("DOMContentLoaded", function () {
             alert("Please select a PDF");
             return;
         }
-
-        answerBox.textContent = "Please wait...";
-        loader.style.display = "block";
-        const pdfPath = `https://raw.githubusercontent.com/kingkuan001/KuanJoe-Learn/main/${selectedPdf}`;
-        extractTextFromPDF(pdfPath);
+        if (!textCache[selectedPdf]) {
+            alert("Please wait for the document to load.");
+            return;
+        }
+        searchAnswer(textCache[selectedPdf]);
     });
 
-    async function extractTextFromPDF(pdfPath) {
+    async function preloadPDFText(pdfName, pdfPath) {
+        loader.style.display = "block";
         try {
             pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js";
             const loadingTask = pdfjsLib.getDocument(pdfPath);
@@ -28,19 +38,19 @@ document.addEventListener("DOMContentLoaded", function () {
             const pagePromises = [];
 
             for (let i = 1; i <= pdf.numPages; i++) {
-                pagePromises.push(pdf.getPage(i).then(page =>
-                    page.getTextContent().then(content =>
-                        content.items.map(item => item.str).join(" ")
-                    )
-                ));
+                pagePromises.push(
+                    pdf.getPage(i).then(async page => {
+                        const content = await page.getTextContent();
+                        return content.items.map(item => item.str).join(" ");
+                    })
+                );
             }
 
             const pageTexts = await Promise.all(pagePromises);
             textContent = pageTexts.join(" ");
-            searchAnswer(textContent);
+            textCache[pdfName] = textContent;
         } catch (error) {
             console.error("Error loading or processing PDF:", error);
-            answerBox.textContent = "Error loading the document. Make sure the file exists and try again.";
         } finally {
             loader.style.display = "none";
         }
@@ -53,7 +63,7 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
 
-        const sentences = textContent.split(/\.|\n/);
+        const sentences = textContent.split(/(?<=[.!?])\s+/);
         let bestMatch = "No relevant answer found.";
 
         for (let sentence of sentences) {
