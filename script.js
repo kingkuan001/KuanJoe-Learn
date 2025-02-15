@@ -9,6 +9,7 @@ document.addEventListener("DOMContentLoaded", function () {
     pdfList.addEventListener("change", function () {
         const selectedPdf = pdfList.value;
         if (selectedPdf && !textCache[selectedPdf]) {
+            searchButton.disabled = true;
             const pdfPath = `https://raw.githubusercontent.com/kingkuan001/KuanJoe-Learn/main/${selectedPdf}`;
             preloadPDFText(selectedPdf, pdfPath);
         }
@@ -49,6 +50,7 @@ document.addEventListener("DOMContentLoaded", function () {
             const pageTexts = await Promise.all(pagePromises);
             textContent = pageTexts.join(" ");
             textCache[pdfName] = textContent;
+            searchButton.disabled = false;
         } catch (error) {
             console.error("Error loading or processing PDF:", error);
         } finally {
