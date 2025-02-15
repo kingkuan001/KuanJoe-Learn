@@ -15,39 +15,50 @@ document.addEventListener("DOMContentLoaded", function () {
         answerBox.textContent = "Please wait...";
         loader.style.display = "block";
 
-        // Construct GitHub Raw URL dynamically
+        // Construct the correct Raw URL for GitHub
         const pdfPath = `https://raw.githubusercontent.com/kingkuan001/KuanJoe-Learn/main/${selectedPdf}`;
 
         extractTextFromPDF(pdfPath);
     });
 
-    async function extractTextFromPDF(pdfPath) {
-        try {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js";
+    function extractTextFromPDF(pdfPath) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js";
 
-            const loadingTask = pdfjsLib.getDocument(pdfPath);
-            const pdf = await loadingTask.promise;
-
+        const loadingTask = pdfjsLib.getDocument(pdfPath);
+        loadingTask.promise.then(pdf => {
             let textContent = "";
+            const promises = [];
+
             for (let i = 1; i <= pdf.numPages; i++) {
-                const page = await pdf.getPage(i);
-                const content = await page.getTextContent();
-                textContent += content.items.map(item => item.str).join(" ") + " ";
+                promises.push(pdf.getPage(i).then(page => {
+                    return page.getTextContent().then(content => {
+                        content.items.forEach(item => {
+                            textContent += item.str + " ";
+                        });
+                    });
+                }));
             }
 
-            searchAnswer(textContent);
-        } catch (error) {
-            console.error("Error loading or processing PDF:", error);
-            answerBox.textContent = "Error loading the document. Make sure the file exists and try again.";
-        } finally {
+            Promise.all(promises).then(() => {
+                searchAnswer(textContent);
+            }).catch(error => {
+                console.error("Error processing PDF pages: ", error);
+                answerBox.textContent = "Error reading the document.";
+            }).finally(() => {
+                loader.style.display = "none";
+            });
+        }).catch(error => {
+            console.error("Error loading PDF: ", error);
+            answerBox.textContent = "Error loading the document. Make sure the file exists.";
             loader.style.display = "none";
-        }
+        });
     }
 
     function searchAnswer(textContent) {
         const query = questionInput.value.trim().toLowerCase();
         if (!query) {
             alert("Please enter a question");
+            loader.style.display = "none";
             return;
         }
 
